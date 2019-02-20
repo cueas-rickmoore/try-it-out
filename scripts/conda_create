@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# should be installed in /usr/local/bin on Macs and Linux
+#
+# the following code assumes that "anaconda.sh" has been sourced
+
+install_type="basic"
+pkg_idx=0
+pkg_filepath="not set"
+pyversion=$PYTHON3_DEFAULT
+shared=false
+venv_name="not set"
+
+while (( "$#" )); do
+    case $1 in
+        -a) install_type="anaconda" ; shift ;;
+        -f|--file)
+            install_type="file" ; shift ;
+            pkg_filepath=$1 ; shift ;
+            ;;
+        --file=?*)
+            install_type="file" ; shift ;
+            pkg_filepath=${1#*=} ; shift ;
+            ;;
+        -n|--name) shift; venv_name=$1 ; shift ;;
+        -p) shift; pyversion=$1 ; shift ;;
+        -s) shared=true ; shift ;;
+        *) break ;;
+    esac
+done
+
+if [ $venv_name = "not set" ] ; then
+    echo "ERROR : no environment name was specified."
+    echo "    add -n your_env_name to your command and retry"
+    exit
+fi
+
+num_additional_pkgs=$#
+
+echo "Requested installation of :"
+if [ $shared = true ] ; then
+    echo "    shared ECRL Python ${pyversion} environment '${venv_name}'"
+enalse
+    echo "    personal Python ${pyversion} environment '${venv_name}'"
+fi
+
+if [ $install_type = anaconda ] ; then
+    echo "   installing full Anaconda package set"
+elif [ $install_type = file ] ; then
+    if [ -f $pkg_filepath ] ; then
+        echo "    installing packages from file"
+        echo "        " $pkg_filepath
+    else
+        echo "ERROR : requsted package file does not exist on this system"
+        echo "    " $pkg_filepath
+        echo "Check path and try again"
+        exit
+    fi
+else
+    echo "installing basic package set"
+    echo "    " $basic_pkgs
+fi
+
+if [ "$num_additional_pkgs" -gt 0 ] ; then
+    packages="$@"
+    echo "additional packages requested :"
+    echo "    " $packages
+else
+    packages=()
+fi
+
+if [ $shared = true ] ; then
+    venv_root_path=$ANACONDA_SHARED_ENVS
+    conda2_root_path=$MINICONDA2_SHARED_ROOT
+    conda3_root_path=$MINICONDA3_SHARED_ROOT
+else
+    venv_root_path=$ANACONDA_HOME_ENVS
+    conda2_root_path=$MINICONDA2_HOME_ROOT
+    conda3_root_path=$MINICONDA3_HOME_ROOT
+fi
+
+venv_path=$venv_root_path/$venv_name
+
+pyversion=$1
+shift
+if [ "$pyversion" = 3 ] ; then
+    pyversion=$PYTHON3_DEFAULT
+elif [ "$pyversion" = 2 ] ; then
+    pyversion=$PYTHON2_DEFAULT
+fi
+
+if [ ${pyversion:0:1} == "3" ] ; then
+    conda_home_path=$conda3_root_path
+else
+    conda_home_path=$conda2_root_path
+fi
+
+if [ "$install_type" = anaconda ] ; then
+    echo "Creating full Anaconda Python ${pyversion} environment in :"
+    echo "    ${venv_path}"
+    $conda_home_path/bin/conda create -p $venv_path python=$pyversion anaconda $packages
+
+elif [ "$install_type" = file ] ; then
+    if [ -f $pkg_filepath ] ; then
+        echo "creating Python ${pyversion} environment in :"
+        echo "    ${venv_path}"
+        echo "from $pkg_filepath}"
+    $conda_home_path/conda create --no-default-packages -p $venv_path --file $pkg_filepath $packages
+
+else
+    echo "creating minimal scientific Python ${pyversion} environment in :"
+    echo "    ${venv_path}"
+    $conda_home_path/conda create --no-default-packages -p $venv_path python=$pyversion $BASIC_PYTHON_PKGS $packages
+fi
+
+if [ -d $venv_path ] ; then
+    echo "successfully created Python environment in :"
+    echo "    ${venv_path}"
+    export venv_name="`basename $venv_path`"
+
+    cd $venv_path
+    ln -s lib/python$pyversion/site-packages .
+
+    cd $venv_path/bin
+    if [ ! -f "conda" ] ; then
+        echo "linking conda command to " $venv_name
+        ln -s $conda_home_path/bin/conda .
+    fi
+    if [ ! -f "activate" ] ; then
+        ln -s $conda_home_path/bin/activate .
+    fi
+    if [ ! -f "deactivate" ] ; then
+        ln -s $conda_home_path/bin/deactivate .
+    fi
+fi
+
