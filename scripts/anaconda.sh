@@ -15,46 +15,39 @@ else
 fi
 export PYTHON2_DEFAULT=2.7
 export PYTHON3_DEFAULT=3.6
-export BASIC_PYTHON_PKGS="numpy scipy pandas xarray h5py netcdf4 matplotlib pillow"
+export PYTHON_ENV_DEFAULT=3.6
 
-export ANACONDA_SHARED_ROOT=/opt/anaconda
-export ANACONDA_SHARED_ENVS=$ANACONDA_SHARED_ROOT/venvs
-export MINICONDA2_SHARED_ROOT=$ANACONDA_SHARED_ROOT/Miniconda2
-export MINICONDA3_SHARED_ROOT=$ANACONDA_SHARED_ROOT/Miniconda3
+export ANACONDA_COMMON_ROOT=/data2/anaconda
+export ANACONDA_DOWNLOAD_ROOT=$ANACONDA_COMMON_ROOT/Downloads
+export ANACONDA_SHARED_ROOT=$ANACONDA_COMMON_ROOT/shared
+export ANACONDA_USERS_ROOT=$ANACONDA_COMMON_ROOT/users
 
-export ANACONDA_HOME_ROOT=$HOME/Anaconda
-export ANACONDA_HOME_ENVS=$ANACONDA_HOME_ROOT/venvs
-export MINICONDA2_HOME_ROOT=$ANACONDA_SHARED_ROOT/Miniconda2
-export MINICONDA3_HOME_ROOT=$ANACONDA_SHARED_ROOT/Miniconda3
+export MINICONDA2_DIRPATH=$ANACONDA_COMMON_ROOT/Miniconda2
+export MINICONDA3_DIRPATH=$ANACONDA_COMMON_ROOT/Miniconda3
 
 activate () {
-    arg="${1//-/}"
-    if [ $arg = "s" ] ; then
+    shared=false
+    # arg="${1//-/}"
+    arg=$1
+    if [ $arg = "-s" ] ; then
         shared=true
         venv_name=$2
-        echo $shared $venv_name
+    elif [ $arg = "-u" ] ; then
+        user_name=$2
+        venv_name=$3
     else
-        shared=false
+        user_name=$LOGNAME
         venv_name=$arg
-        echo $shared $venv_name
     fi
     if [ $venv_name = "Miniconda2" ] ; then
-        if [ $shared = true ] ; then
-            python_venv=$MINICONDA2_SHARED_ROOT
-        else
-            python_venv=$MINICONDA2_HOME_ROOT
-        fi
+            python_venv=$MINICONDA2_DIRPATH
     elif [ $venv_name = "Miniconda3" ] ; then
-        if [ $shared = true ] ; then
-            python_venv=$MINICONDA3_SHARED_ROOT
-        else
-            python_venv=$MINICONDA3_HOME_ROOT
-        fi
+            python_venv=$MINICONDA3_DIRPATH
     else
         if [ $shared = true ] ; then
-            python_venv=$ANACONDA_SHARED_ENVS/$venv_name
+            python_venv=$ANACONDA_SHARED_ROOT/$venv_name
         else
-            python_venv=$ANACONDA_HOME_ENVS/$venv_name
+            python_venv=$ANACONDA_USERS_ROOT/$user_name/$venv_name
         fi
     fi
     # activate any active environment

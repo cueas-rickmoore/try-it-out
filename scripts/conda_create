@@ -1,5 +1,5 @@
 #!/bin/bash
-
+this_script_name=`basename "$0"`
 # should be installed in /usr/local/bin on Macs and Linux
 #
 # the following code assumes that "anaconda.sh" has been sourced
@@ -7,24 +7,38 @@
 install_type="basic"
 pkg_idx=0
 pkg_filepath="not set"
-pyversion=$PYTHON3_DEFAULT
+pyversion=$PYTHON_ENV_DEFAULT
 shared=false
+user_home=$HOME
+user_name=$LOGNAME
 venv_name="not set"
 
 while (( "$#" )); do
     case $1 in
         -a) install_type="anaconda" ; shift ;;
-        -f|--file)
-            install_type="file" ; shift ;
+        -f) install_type="file" ; shift ;
             pkg_filepath=$1 ; shift ;
             ;;
-        --file=?*)
-            install_type="file" ; shift ;
-            pkg_filepath=${1#*=} ; shift ;
-            ;;
-        -n|--name) shift; venv_name=$1 ; shift ;;
+        -n) shift; venv_name=$1 ; shift ;;
         -p) shift; pyversion=$1 ; shift ;;
-        -s) shared=true ; shift ;;
+        -s) echo "create a shared environment"
+            shared=true ; shift ;;
+
+        -h) echo " " ; echo "usage: ${this_script_name} -n environment_name [...]";
+            echo " " ; echo "arguments :";
+            echo "  -a           create environment containing full Anaconda distribution";
+            echo "  -f filepath  create environment containing packages in file @ filepath";
+            echo "  -p           Python version number (default = ${PYTHON_ENV_DEFAULT}";
+            echo "  -s           create a shared environment (default creates personal environment";
+            echo " [...]         list of additional Python packages to install";
+            echo " ";
+            echo "Default action is to create a basic environment unless -a or -f args are used.";
+            echo "    The list of basic packages will be read from 'anaconda-base-pkgs.txt'";
+            echo "    in ${ANACONDA_COMMON_ROOT}/scripts unless there is a file in $user_home";
+            echo "    with the same name.";
+            echo " ";
+            exit
+            ;;
         *) break ;;
     esac
 done
@@ -40,8 +54,8 @@ num_additional_pkgs=$#
 echo "Requested installation of :"
 if [ $shared = true ] ; then
     echo "    shared ECRL Python ${pyversion} environment '${venv_name}'"
-enalse
-    echo "    personal Python ${pyversion} environment '${venv_name}'"
+else
+    echo "    ${user_name} personal Python ${pyversion} environment '${venv_name}'"
 fi
 
 if [ $install_type = anaconda ] ; then
@@ -70,29 +84,22 @@ else
 fi
 
 if [ $shared = true ] ; then
-    venv_root_path=$ANACONDA_SHARED_ENVS
-    conda2_root_path=$MINICONDA2_SHARED_ROOT
-    conda3_root_path=$MINICONDA3_SHARED_ROOT
+    venv_root_path=$ANACONDA_SHARED_ROOT
 else
-    venv_root_path=$ANACONDA_HOME_ENVS
-    conda2_root_path=$MINICONDA2_HOME_ROOT
-    conda3_root_path=$MINICONDA3_HOME_ROOT
+    venv_root_path=$ANACONDA_USERS_ROOT/$LOGNAME
 fi
-
 venv_path=$venv_root_path/$venv_name
 
-pyversion=$1
-shift
 if [ "$pyversion" = 3 ] ; then
     pyversion=$PYTHON3_DEFAULT
 elif [ "$pyversion" = 2 ] ; then
     pyversion=$PYTHON2_DEFAULT
 fi
 
-if [ ${pyversion:0:1} == "3" ] ; then
-    conda_home_path=$conda3_root_path
+if [ ${pyversion:0:1} = "3" ] ; then
+    conda_home_path=$MINICONDA3_DIRPATH
 else
-    conda_home_path=$conda2_root_path
+    conda_home_path=$MINICONDA2_DIRPATH
 fi
 
 if [ "$install_type" = anaconda ] ; then
@@ -104,13 +111,19 @@ elif [ "$install_type" = file ] ; then
     if [ -f $pkg_filepath ] ; then
         echo "creating Python ${pyversion} environment in :"
         echo "    ${venv_path}"
-        echo "from $pkg_filepath}"
+        echo "from $pkg_filepath"
+    fi
     $conda_home_path/conda create --no-default-packages -p $venv_path --file $pkg_filepath $packages
 
 else
-    echo "creating minimal scientific Python ${pyversion} environment in :"
+    echo "creating basic scientific Python ${pyversion} environment in :"
     echo "    ${venv_path}"
-    $conda_home_path/conda create --no-default-packages -p $venv_path python=$pyversion $BASIC_PYTHON_PKGS $packages
+    package_file=$user_home/anaconda-base-pkgs.txt
+    if [ ! -f $package_file ] ; then
+        package_file=$ANACONDA_COMMON_ROOT/scripts/anaconda-base-pkgs.txt
+    fi
+    echo "    containing packages in ${package_file}"
+    $conda_home_path/bin//conda create --no-default-packages -p $venv_path --file $package_file python=$pyversion $packages
 fi
 
 if [ -d $venv_path ] ; then
@@ -133,4 +146,3 @@ if [ -d $venv_path ] ; then
         ln -s $conda_home_path/bin/deactivate .
     fi
 fi
-

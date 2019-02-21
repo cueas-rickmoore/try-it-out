@@ -1,0 +1,9 @@
+numpy
+scipy
+pandas
+xarray
+h5py
+netcdf4
+pillow
+matplotlib
+seaborn

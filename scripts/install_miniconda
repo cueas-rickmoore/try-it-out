@@ -4,95 +4,96 @@
 #
 # assumes that "anaconda.sh" has been sourced
 
-shared=false
+conda_version=3
+download=true
 while (( "$#" )); do
     case $1 in
-        -s) shared=true ; shift ;;
-        *) CONDA_VERSION=$1 ;;
+        -d) download=false ; shift ;;
+         2) conda_version=2 ; shift ;;
+         3) conda_version=3 ; shift ;;
+         *) break ;;
     esac
 done       
 
-if [ $shared = true ] ; then
-    shift
-    VENV_ROOT=$ANACONDA_SHARED_ENVS
-    CONDA2_ROOT=$CONDA2_SHARED_ROOT
-    CONDA3_ROOT=$CONDA3_SHARED_ROOT
-else
-    VENV_ROOT=$ANACONDA_HOME_ENVS
-    CONDA2_ROOT=$CONDA2_HOME_ROOT
-    CONDA3_ROOT=$CONDA3_HOME_ROOT
-fi
-VENV_PATH=$VENV_ROOT/$VENV_NAME
-
-if [ "$CONDA_VERSION" = 2 ] ; then
-    INSTALL_ROOT=$CONDA2_ROOT
-    MINICONDA="Miniconda2"
-elif [ "$CONDA_VERSION" = 3 ] ; then
-    INSTALL_ROOT=$CONDA3_ROOT
-    MINICONDA="Miniconda3"
-else
-    echo "Miniconda${CONDA_VERSION} is not valid, first argument to this script must be either 2 or 3"
-    echo "exiting"
-    exit
+install_root=$ANACONDA_COMMON_ROOT
+if [ ! -d $install_root ] ; then
+     mkdir -p  $install_root
 fi
 
-if [ ! -d $INSTALL_ROOT ] ; then
-     mkdir -p  $INSTALL_ROOT
+if [ "$conda_version" = 2 ] ; then
+    miniconda="Miniconda2"
+elif [ "$conda_version" = 3 ] ; then
+    miniconda="Miniconda3"
 fi
 
-CONDA_DIRPATH=$INSTALL_ROOT/$MINICONDA
+install_dirpath=$install_root/$miniconda
 
-if [ -d $CONDA_DIRPATH ] ; then
-    if [ -d $CONDA_DIRPATH/bin ] ; then
-        if [ -f $CONDA_DIRPATH/bin/conda ] ; then
-            echo "A valid installation of ${MINICONDA} already exists."
-            echo "Either remove that install ('rm -R ${CONDA_DIRPATH}') and try again"
+if [ -d $install_dirpath ] ; then
+    if [ -d $install_dirpath/bin ] ; then
+        if [ -f $install_dirpath/bin/conda ] ; then
+            echo "A valid installation of ${miniconda} already exists."
+            echo "Either remove that install ('rm -R ${install_dirpath}') and try again"
             echo "    OR"
-            echo "update to the latest version ('${CONDA_DIRPATH}/bin/conda update conda')"
+            echo "update to the latest version ('${install_dirpath}/bin/conda update conda')"
             exit
-    echo "A broken installation of ${MINICONDA} was found."
-    echo "remove it ('rm -R ${CONDA_DIRPATH}') and try again"
+        fi
+    fi
+    echo "A broken installation of ${miniconda} was found."
+    echo "remove it ('rm -R ${install_dirpath}') and try again"
     exit
+fi
 
 # CAUTION : the following assumes anything NOT Darwin is Linux
-KERNEL=`uname -s`
-if [ $KERNEL == "Darwin"] || [ $KERNEL == "darwin"] ; then
-    PLATFORM="MacOSX"
+os_kernel=`uname -s`
+if [ $os_kernel == "Darwin" ] || [ $os_kernel == "darwin" ] ; then
+    os_platform="MacOSX"
 else
-    PLATFORM="Linux"
+    os_platform="Linux"
 fi
 
-KERNEL_ARCHITECTURE=`uname -m`
-REPO_PACKAGE=$MINICONDA-latest-$PLATFORM-$KERNEL_ARCHITECTURE.sh
+kernel_architecture=`uname -m`
+repo_package=$miniconda-latest-$os_platform-${kernel_architecture}.sh
 
-echo "Attemting to download ${MINICONDA} for ${PLATFORM} ${KERNEL_ARCHITECTURE}"
-DOWNLOAD_DIR=$VENV_ROOT/Downloads
-if [ !-d $DOWNLOAD_DIR ] ; then
-    mkdir -m 755 $DOWNLOAD_DIR
+if [ ! -d $ANACONDA_DOWNLOAD_ROOT ] ; then
+    mkdir -m 755 $ANACONDA_DOWNLOAD_ROOT
 fi
 
-SCRIPT_PATH=$DOWNLOAD_DIR/$MINICONDA.sh
-curl "https://repo.continuum.io/miniconda/$REPO_PACKAGE" > $SCRIPT_PATH
+script_path=$ANACONDA_DOWNLOAD_ROOT/${repo_package}
 
-if [ -f $SCRIPT_PATH ] ; then
-    echo "Installing ${MINICONDA} in ${CONDA_ROOT}"
-    /bin/bash $SCRIPT_PATH -b 0 -p $CONDA_ROOT 
-    if [ -d $CONDA_DIRPATH/bin ] && [ -f $CONDA_ROOT/bin/conda ] && [ -f $CONDA_ROOT/etc/profile.d/conda.sh ] ; then
-        echo "Installation of ${MINICONDA} succeded"
+if [ $download = true ] ; then
+    echo "Downloading ${repo_package}"
+    echo "    to $ANACONDA_DOWNLOAD_ROOT"
+    read -p "Is this correct (yes/no) ? " doit
+    case ${doit:0:1} in
+        y|Y) curl "https://repo.continuum.io/miniconda/$repo_package" > $script_path ;; 
+        *) echo "Exiting" ; exit;;
+    esac
+    if [ ! -f $script_path ] ; then
+        echo "Download of ${repo_package} failed"
+        exit 
+    fi
+else
+   echo "Installing ${miniconda} from ${repo_package}"
+fi
+
+if [ -f $script_path ] ; then
+    echo "Installing ${miniconda} in ${install_dirpath}"
+    /bin/bash $script_path -b 0 -p $install_dirpath 
+    if [ -d $install_dirpath/bin ] && [ -f $install_dirpath/bin/conda ] && [ -f $install_dirpath/etc/profile.d/conda.sh ] ; then
+        echo "Installation of ${miniconda} succeded"
     else
-        echo "Installation of ${MINICONDA} failed"
+        echo "Installation of ${miniconda} failed"
+    fi
 else
-    echo "Download of" $REPO_VERSION "failed"
+    echo "${script_path} was not found"
+    exit
 fi
 
-if [ -f $SCRIPT_PATH ] ; then
-    echo "Do you want to delete the ${MINICONDA} install script (yes, no) ?"
-    select yn in "yes" "no"; do
-        case $yn in
-            yes ) rm $SCRIPT_PATH ; echo "${SCRIPT_PATH} was deleted"; break;;
-            no ) "Keeping ${SCRIPT_PATH}" ; exit;;
-            * ) "Please enter yes or no."
-        esac
-    done
+if [[ $download = true && -f $script_path ]] ; then
+    read -p "Do you want to delete the ${miniconda} script (yes, no)  ? " doit
+    case ${doit:0:1} in
+        y|Y ) rm $script_path ; echo "${script_path} was deleted" ;;
+        * ) "Saving ${script_path}" ; break ;;
+    esac
 fi
 
