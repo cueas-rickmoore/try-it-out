@@ -6,4 +6,7 @@ h5py
 netcdf4
 pillow
 matplotlib
+proj4
+cartopy
+basemap
 seaborn
